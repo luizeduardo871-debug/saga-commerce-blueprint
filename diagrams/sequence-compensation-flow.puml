@@ -1,0 +1,42 @@
+@startuml
+title Sequência de falha — pagamento recusado e compensação
+autonumber
+participant "Saga Orchestrator" as S
+queue "Broker" as B
+participant "Order Service" as O
+participant "Inventory Service" as I
+participant "Payment Service" as P
+actor Cliente
+
+S -> B : CreatePendingOrder
+B -> O : CreatePendingOrder
+O --> B : OrderCreated
+B --> S : OrderCreated
+S -> B : ReserveStock
+B -> I : ReserveStock
+I --> B : StockReserved
+B --> S : StockReserved
+S -> B : AuthorizePayment(idempotencyKey)
+B -> P : AuthorizePayment
+P --> B : PaymentRejected
+B --> S : PaymentRejected
+S -> S : Estado COMPENSATING
+S -> B : ReleaseStock(reservationId)
+B -> I : ReleaseStock
+I -> I : Liberar reserva (idempotente)
+I --> B : StockReleased
+B --> S : StockReleased
+S -> B : CancelOrder(orderId)
+B -> O : CancelOrder
+O -> O : Marcar CANCELLED
+O --> B : OrderCancelled
+B --> S : OrderCancelled
+S -> S : Estado COMPENSATED
+S --> Cliente : Compra não concluída
+
+note over S,I
+Se a compensação falhar temporariamente,
+persistir a etapa, aplicar retry e não
+marcar COMPENSATED antes da confirmação.
+end note
+@enduml

@@ -1,0 +1,33 @@
+@startuml
+title Visão geral — Saga por Orquestração
+left to right direction
+actor Cliente
+rectangle "API / Checkout" as API
+queue "Message Broker\n(commands / results)" as MQ
+component "Saga Orchestrator\n(state machine)" as ORCH
+database "Saga State Store" as STATE
+component "Order Service" as ORDER
+database "Order DB" as ODB
+component "Inventory Service" as INV
+database "Inventory DB" as IDB
+component "Payment Service" as PAY
+database "Payment DB" as PDB
+cloud "Gateway financeiro" as GW
+
+Cliente --> API : Solicitar compra
+API --> ORCH : Start Saga
+ORCH --> STATE : Persistir estado
+ORCH <--> MQ : Comandos / resultados
+MQ <--> ORDER
+MQ <--> INV
+MQ <--> PAY
+ORDER --> ODB
+INV --> IDB
+PAY --> PDB
+PAY <--> GW
+note bottom of ORCH
+Coordena etapas, timeouts,
+retry e compensações.
+Cada serviço mantém seu banco.
+end note
+@enduml

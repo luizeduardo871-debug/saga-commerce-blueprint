@@ -1,0 +1,38 @@
+@startuml
+title Sequência de sucesso — compra concluída
+autonumber
+actor Cliente
+participant "Checkout/API" as API
+participant "Saga Orchestrator" as S
+queue "Broker" as B
+participant "Order Service" as O
+participant "Inventory Service" as I
+participant "Payment Service" as P
+
+Cliente -> API : Solicitar compra
+API -> S : StartSaga(order data)
+S -> S : Persistir STARTED
+S -> B : CreatePendingOrder
+B -> O : CreatePendingOrder
+O -> O : Criar pedido PENDING
+O --> B : OrderCreated
+B --> S : OrderCreated
+S -> B : ReserveStock
+B -> I : ReserveStock
+I -> I : Reservar itens
+I --> B : StockReserved
+B --> S : StockReserved
+S -> B : AuthorizePayment(idempotencyKey)
+B -> P : AuthorizePayment
+P -> P : Autorizar no gateway
+P --> B : PaymentAuthorized
+B --> S : PaymentAuthorized
+S -> B : ConfirmOrder
+B -> O : ConfirmOrder
+O -> O : Atualizar para CONFIRMED
+O --> B : OrderConfirmed
+B --> S : OrderConfirmed
+S -> S : Persistir COMPLETED
+S --> API : Compra confirmada
+API --> Cliente : Confirmação
+@enduml
